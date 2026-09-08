@@ -1,0 +1,30 @@
+# Weights and datasets — keep these on Drive/Colab, not GitHub
+models/
+data/
+checkpoints/
+results/
+
+# Runtime job queue (Drive worker)
+workspace/jobs/
+workspace/logs/
+workspace/progress/
+workspace/workplace_status.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Adapter / trainer blobs if they appear outside checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.cursor/
+*.swp

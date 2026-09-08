@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gated_lora workplace</title>
+  <style>
+    :root {
+      --bg: #111214;
+      --panel: #1a1b1e;
+      --line: #2a2c31;
+      --text: #ececec;
+      --muted: #9a9ca3;
+      --accent: #c7a36a;
+      --ok: #7dcea0;
+      --warn: #e6b84d;
+      --bad: #e07a6a;
+      --queued: #8ea2c6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header, main { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+    header { padding-top: 28px; padding-bottom: 8px; }
+    .alert {
+      display: none;
+      margin: 16px 0 0;
+      padding: 14px 16px;
+      border: 1px solid var(--bad);
+      border-radius: 10px;
+      background: #2a1614;
+      color: #f0c7c0;
+    }
+    .alert.on { display: block; }
+    .alert a { color: var(--accent); }
+    h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+    h2 { margin: 0 0 12px; font-size: 15px; font-weight: 600; }
+    .sub { color: var(--muted); }
+    .grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 16px; margin: 20px 0; }
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
+    .metric {
+      background: #121316;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .metric .k { color: var(--muted); font-size: 12px; }
+    .metric .v { font-size: 18px; font-weight: 600; margin-top: 4px; }
+    .bar {
+      height: 8px;
+      background: #0c0d0f;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--accent);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+    .row { display: flex; justify-content: space-between; gap: 12px; margin: 8px 0; }
+    .label { color: var(--muted); }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+    }
+    .online { color: var(--ok); border-color: var(--ok); }
+    .offline { color: var(--bad); border-color: var(--bad); }
+    .st-queued { color: var(--queued); }
+    .st-running { color: var(--warn); }
+    .st-succeeded { color: var(--ok); }
+    .st-failed, .st-cancelled { color: var(--bad); }
+    button {
+      background: var(--accent);
+      color: #1b1408;
+      border: 0;
+      border-radius: 7px;
+      padding: 8px 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--line);
+    }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; }
+    tr.active td { background: #22242a; }
+    pre {
+      background: #0c0d0f;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      overflow: auto;
+      max-height: 360px;
+      min-height: 160px;
+      white-space: pre-wrap;
+    }
+    ol { margin: 8px 0 0 18px; color: var(--muted); }
+    code { color: var(--accent); }
+    @media (max-width: 800px) {
+      .grid, .metrics { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gated_lora gateway</h1>
+    <div class="sub">This page cannot train. It only shows jobs after Colab A100 is running.</div>
+    <div id="offline-alert" class="alert">
+      <strong>Workplace offline — you will see no progress.</strong>
+      The three queued jobs are waiting. Open
+      <a href="https://colab.research.google.com/" target="_blank" rel="noreferrer">Google Colab</a>,
+      then File → Open notebook → Google Drive →
+      <code>gated_lora/workplace/colab_worker.ipynb</code>.
+      Runtime → Change runtime type → GPU → A100. Run all cells and leave the last cell running.
+      This banner turns off when the worker heartbeat arrives.
+    </div>
+  </header>
+  <main>
+    <div class="grid">
+      <section class="panel">
+        <h2>Workplace</h2>
+        <div class="row"><span class="label">Status</span><span id="wp-status" class="pill offline">checking</span></div>
+        <div class="row"><span class="label">GPU</span><span id="wp-gpu">—</span></div>
+        <div class="row"><span class="label">Current job</span><span id="wp-job">—</span></div>
+        <div class="row"><span class="label">Heartbeat</span><span id="wp-beat">—</span></div>
+        <p class="sub" id="wp-reason"></p>
+        <ol>
+          <li>Open <code>workplace/colab_worker.ipynb</code> in Colab on A100.</li>
+          <li>Leave the worker cell running. This page should go online.</li>
+          <li>Queue a job here, then watch the live panel below.</li>
+        </ol>
+      </section>
+      <section class="panel">
+        <h2>Queue a job</h2>
+        <p class="sub">If the workplace is offline, the job waits in Drive until Colab starts.</p>
+        <div class="actions">
+          <button id="btn-train">Queue train</button>
+          <button id="btn-eval" class="secondary">Queue eval</button>
+        </div>
+        <p class="sub" id="queue-msg"></p>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Live job <span id="live-id" class="sub"></span></h2>
+      <div class="row">
+        <span class="label">Status</span>
+        <span id="live-status">no job selected</span>
+      </div>
+      <div class="row">
+        <span class="label">Message</span>
+        <span id="live-msg">Start the Colab worker, then queue a job.</span>
+      </div>
+      <div class="bar"><span id="live-bar"></span></div>
+      <div class="metrics">
+        <div class="metric"><div class="k">Step</div><div class="v" id="m-step">—</div></div>
+        <div class="metric"><div class="k">Loss</div><div class="v" id="m-loss">—</div></div>
+        <div class="metric"><div class="k">Epoch</div><div class="v" id="m-epoch">—</div></div>
+        <div class="metric"><div class="k">Percent</div><div class="v" id="m-pct">—</div></div>
+      </div>
+      <p class="sub" id="live-line"></p>
+    </section>
+
+    <section class="panel" style="margin: 16px 0;">
+      <h2>Jobs</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Progress</th>
+            <th>Updated</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="jobs"></tbody>
+      </table>
+    </section>
+
+    <section class="panel" style="margin: 16px 0 32px;">
+      <h2>Log tail <span id="log-id" class="sub"></span></h2>
+      <pre id="log">Waiting for Colab log lines. Drive sync can take 10–30 seconds after the worker starts.</pre>
+    </section>
+  </main>
+  <script>
+    let selected = null;
+    let followRunning = true;
+
+    async function api(path, opts) {
+      const res = await fetch(path, { cache: "no-store", ...opts });
+      if (!res.ok) throw new Error(await res.text() || res.statusText);
+      const type = res.headers.get("content-type") || "";
+      return type.includes("application/json") ? res.json() : res.text();
+    }
+
+    function fmt(v, digits=4) {
+      if (v === null || v === undefined || v === "") return "—";
+      if (typeof v === "number") return Number.isInteger(v) ? String(v) : v.toFixed(digits);
+      return String(v);
+    }
+
+    function pill(online) {
+      const el = document.getElementById("wp-status");
+      el.textContent = online ? "online" : "offline";
+      el.className = "pill " + (online ? "online" : "offline");
+    }
+
+    function renderLive(job) {
+      const p = (job && job.progress) || {};
+      const status = job ? job.status : "none";
+      document.getElementById("live-id").textContent = job ? job.id : "";
+      document.getElementById("live-status").textContent = job
+        ? `${job.type} · ${status}`
+        : "no job selected";
+      document.getElementById("live-status").className = "st-" + status;
+      document.getElementById("live-msg").textContent =
+        p.message || job?.message || "No progress file yet. If Colab is running, wait for Drive to sync.";
+      const pct = p.percent;
+      document.getElementById("live-bar").style.width = (pct || 0) + "%";
+      const step = p.max_steps ? `${fmt(p.step, 0)} / ${fmt(p.max_steps, 0)}` : fmt(p.step, 0);
+      document.getElementById("m-step").textContent = step;
+      document.getElementById("m-loss").textContent = fmt(p.loss ?? p.eval_loss ?? p.last_score);
+      document.getElementById("m-epoch").textContent = fmt(p.epoch, 3);
+      document.getElementById("m-pct").textContent = pct == null ? "—" : `${fmt(pct, 1)}%`;
+      document.getElementById("live-line").textContent = p.last_line
+        ? "Last line: " + p.last_line
+        : (p.updated_at ? "Progress updated " + p.updated_at : "");
+    }
+
+    async function refreshWorkspace() {
+      const data = await api("/api/workspace");
+      const wp = data.workplace || {};
+      pill(!!wp.online);
+      document.getElementById("wp-gpu").textContent = wp.gpu || wp.requested_gpu || "A100 (not connected)";
+      document.getElementById("wp-job").textContent = wp.current_job_id || "idle";
+      document.getElementById("wp-beat").textContent = wp.updated_at
+        ? `${wp.updated_at} (${wp.age_seconds ?? "?"}s ago)`
+        : "none";
+      document.getElementById("wp-reason").textContent = wp.online
+        ? "Worker connected. Queue or watch a job."
+        : (wp.reason || "Colab worker is not sending a heartbeat.");
+      document.getElementById("offline-alert").className = "alert" + (wp.online ? "" : " on");
+      if (followRunning && wp.current_job_id) selected = wp.current_job_id;
+      if (wp.progress && selected === wp.current_job_id) {
+        renderLive({ id: wp.current_job_id, type: "job", status: "running", progress: wp.progress });
+      }
+    }
+
+    async function refreshJobs() {
+      const data = await api("/api/jobs");
+      const jobs = data.jobs || [];
+      if (followRunning) {
+        const running = jobs.find(j => j.status === "running");
+        if (running) selected = running.id;
+        else if (!selected && jobs[0]) selected = jobs[0].id;
+      }
+      const body = document.getElementById("jobs");
+      body.innerHTML = "";
+      for (const job of jobs) {
+        const tr = document.createElement("tr");
+        if (job.id === selected) tr.className = "active";
+        const p = job.progress || {};
+        const summary = p.message || job.message || "";
+        const cancel = job.status === "queued"
+          ? `<button class="secondary" data-cancel="${job.id}">Cancel</button>`
+          : "";
+        tr.innerHTML = `
+          <td><code>${job.id}</code></td>
+          <td>${job.type}</td>
+          <td class="st-${job.status}">${job.status}</td>
+          <td>${summary}</td>
+          <td>${job.updated_at || ""}</td>
+          <td><button class="secondary" data-log="${job.id}">Watch</button> ${cancel}</td>
+        `;
+        body.appendChild(tr);
+      }
+      const current = jobs.find(j => j.id === selected);
+      renderLive(current);
+    }
+
+    async function refreshLog() {
+      if (!selected) return;
+      const text = await api(`/api/jobs/${selected}/log`);
+      const el = document.getElementById("log");
+      document.getElementById("log-id").textContent = selected;
+      el.textContent = text || "No log yet. The worker writes this after it claims the job.";
+      el.scrollTop = el.scrollHeight;
+    }
+
+    async function tick() {
+      try {
+        await refreshWorkspace();
+        await refreshJobs();
+        await refreshLog();
+      } catch (err) {
+        document.getElementById("wp-reason").textContent = String(err);
+      }
+    }
+
+    document.getElementById("btn-train").onclick = async () => {
+      const job = await api("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "train" }),
+      });
+      document.getElementById("queue-msg").textContent = "Queued train " + job.id;
+      selected = job.id;
+      followRunning = true;
+      await tick();
+    };
+
+    document.getElementById("btn-eval").onclick = async () => {
+      const job = await api("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "eval" }),
+      });
+      document.getElementById("queue-msg").textContent = "Queued eval " + job.id;
+      selected = job.id;
+      followRunning = true;
+      await tick();
+    };
+
+    document.getElementById("jobs").onclick = async (event) => {
+      const logId = event.target.getAttribute("data-log");
+      const cancelId = event.target.getAttribute("data-cancel");
+      if (logId) {
+        selected = logId;
+        followRunning = false;
+        await tick();
+      }
+      if (cancelId) {
+        await api(`/api/jobs/${cancelId}/cancel`, { method: "POST" });
+        await tick();
+      }
+    };
+
+    tick();
+    setInterval(tick, 2000);
+  </script>
+</body>
+</html>

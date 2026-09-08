@@ -1,0 +1,64 @@
+{
+  "workplace": {
+    "name": "colab-a100",
+    "kind": "google_colab",
+    "gpu": "A100",
+    "drive_root_colab": "/content/drive/MyDrive/gated_lora",
+    "local_model": "/content/Qwen3-VL-8B-Instruct",
+    "drive_model": "/content/drive/MyDrive/gated_lora/models/Qwen3-VL-8B-Instruct",
+    "heartbeat_stale_seconds": 45
+  },
+  "paths": {
+    "jobs_dir": "workspace/jobs",
+    "logs_dir": "workspace/logs",
+    "status_file": "workspace/workplace_status.json"
+  },
+  "defaults": {
+    "train": {
+      "model_name": "/content/Qwen3-VL-8B-Instruct",
+      "train_manifest": "/content/drive/MyDrive/gated_lora/data/manifests/train_80k.jsonl",
+      "eval_manifest": "/content/drive/MyDrive/gated_lora/data/manifests/eval_20k.jsonl",
+      "output_dir": "/content/drive/MyDrive/gated_lora/checkpoints/qlora_r8",
+      "data_root": "/content/drive/MyDrive/gated_lora/data",
+      "lora_rank": 8,
+      "batch_size": 8,
+      "grad_accum": 4,
+      "epochs": 1,
+      "learning_rate": 0.0002,
+      "save_steps": 200
+    },
+    "gated_train": {
+      "model_name": "/content/Qwen3-VL-8B-Instruct",
+      "train_manifest": "/content/drive/MyDrive/gated_lora/data/manifests/train_80k.jsonl",
+      "eval_manifest": "/content/drive/MyDrive/gated_lora/data/manifests/eval_20k.jsonl",
+      "output_dir": "/content/drive/MyDrive/gated_lora/checkpoints/gated_qlora_r8",
+      "data_root": "/content/drive/MyDrive/gated_lora/data",
+      "lora_rank": 8,
+      "lora_alpha": 16,
+      "lora_dropout": 0.05,
+      "gate_init": 2.0,
+      "batch_size": 8,
+      "grad_accum": 4,
+      "epochs": 1,
+      "learning_rate": 0.0002,
+      "save_steps": 200
+    },
+    "gated_eval": {
+      "model_name": "/content/Qwen3-VL-8B-Instruct",
+      "lora_path": "/content/drive/MyDrive/gated_lora/checkpoints/gated_qlora_r8/final_adapter",
+      "eval_manifest": "/content/drive/MyDrive/gated_lora/data/manifests/eval_20k.jsonl",
+      "output_file": "/content/drive/MyDrive/gated_lora/results/gated_qlora_eval_predictions.jsonl",
+      "data_root": "/content/drive/MyDrive/gated_lora/data",
+      "adapter_type": "gated",
+      "max_new_tokens": 32
+    },
+    "eval": {
+      "model_name": "/content/Qwen3-VL-8B-Instruct",
+      "lora_path": "/content/drive/MyDrive/gated_lora/checkpoints/qlora_r8/final_adapter",
+      "eval_manifest": "/content/drive/MyDrive/gated_lora/data/manifests/eval_20k.jsonl",
+      "output_file": "/content/drive/MyDrive/gated_lora/results/qwen3vl_eval_predictions.jsonl",
+      "data_root": "/content/drive/MyDrive/gated_lora/data",
+      "max_new_tokens": 32
+    }
+  }
+}
